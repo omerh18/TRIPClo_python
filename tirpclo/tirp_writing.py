@@ -1,7 +1,7 @@
 from typing.io import TextIO
 from typing import List
-from data_types import STI, SequenceDB
-import constants
+from tirpclo.data_types import STI, SequenceDB
+from tirpclo import constants
 
 
 def write_tirp(
@@ -39,7 +39,7 @@ def write_tirp(
         stis.sort()
         tirp_text_representation += f"{seq_db.db[i][0].entity} {__get_stis_as_str(stis)} "
 
-    out_file.write(f'{tirp_text_representation}\n')
+    out_file.write(f'{tirp_text_representation[: -1]}\n')
 
 
 def __get_stis_as_str(

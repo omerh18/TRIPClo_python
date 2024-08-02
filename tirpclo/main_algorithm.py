@@ -1,11 +1,11 @@
 from typing import List, Dict, Optional, Tuple
-from data_types import SequenceDB, TiepProjector, CoincidenceSequence, PatternInstance
 from typing.io import TextIO
-from tiep_index import TiepIndex
-import candidate_generation
-import tirp_writing
-import projection
-import constants
+from tirpclo.data_types import SequenceDB, TiepProjector, CoincidenceSequence, PatternInstance
+from tirpclo.tiep_index import TiepIndex
+from tirpclo import candidate_generation
+from tirpclo import tirp_writing
+from tirpclo import projection
+from tirpclo import constants
 
 
 def discover_tirps(

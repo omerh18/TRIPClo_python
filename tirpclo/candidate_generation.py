@@ -1,8 +1,8 @@
 from typing import List, Dict, Optional
-from data_types import TiepProjector, SequenceDB, Coincidence, Tiep, PatternInstance
-from tiep_index import TiepIndex, MasterTiep
-import constants
-import utils
+from tirpclo.data_types import TiepProjector, SequenceDB, Coincidence, Tiep, PatternInstance
+from tirpclo.tiep_index import TiepIndex, MasterTiep
+from tirpclo import constants
+from tirpclo import utils
 
 
 def get_tiep_projectors(

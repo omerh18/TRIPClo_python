@@ -2,8 +2,8 @@ from typing import List, Dict, Any
 from typing.io import TextIO
 from pathlib import Path
 import argparse
-from data_types import Tiep, STI
-import constants
+from tirpclo.data_types import Tiep, STI
+from tirpclo import constants
 
 
 def parse_arguments(

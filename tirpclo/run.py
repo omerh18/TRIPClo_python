@@ -1,11 +1,11 @@
 from typing.io import TextIO
 import math
 import time
-from data_types import SequenceDB
-from tiep_index import TiepIndex
-import stis2seq
-import tirpclo
-import utils
+from tirpclo.data_types import SequenceDB
+from tirpclo.tiep_index import TiepIndex
+from tirpclo import main_algorithm
+from tirpclo import stis2seq
+from tirpclo import utils
 
 
 def run_tirpclo(
@@ -36,7 +36,7 @@ def run_tirpclo(
 
     index: TiepIndex = TiepIndex()
     initial_seq_db: SequenceDB = stis2seq.transform_input_file_to_seq_db(in_file_path, index)
-    tirpclo.discover_tirps(index, initial_seq_db, min_support, maximal_gap, out_file)
+    main_algorithm.discover_tirps(index, initial_seq_db, min_support, maximal_gap, out_file)
 
     end_time: float = time.time()
 

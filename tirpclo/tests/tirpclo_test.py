@@ -1,6 +1,6 @@
 import os
-from main import run_tirpclo
-import utils
+from tirpclo.run import run_tirpclo
+from tirpclo import utils
 
 
 def test_tirpclo_on_asl(
@@ -10,7 +10,7 @@ def test_tirpclo_on_asl(
     num_entities: int = 65
     min_support_percentage: float = 0.5
     maximal_gap: int = 30
-    in_file_path: str = '../datasets/asl/asl.csv'
+    in_file_path: str = '../../datasets/asl/asl.csv'
     out_file_path: str = f'asl-support-{min_support_percentage}-gap-{maximal_gap}.txt'
 
     run_tirpclo(

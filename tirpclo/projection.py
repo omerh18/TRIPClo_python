@@ -1,9 +1,9 @@
 from typing import List, Optional, Tuple
 import copy
-from data_types import SequenceDB, CoincidenceSequence, PatternInstance, Tiep, TiepProjector, Coincidence
-from tiep_index import TiepIndex, MasterTiep
-import constants
-import utils
+from tirpclo.data_types import SequenceDB, CoincidenceSequence, PatternInstance, Tiep, TiepProjector, Coincidence
+from tirpclo.tiep_index import TiepIndex, MasterTiep
+from tirpclo import constants
+from tirpclo import utils
 
 
 def project_initial_seq_db(

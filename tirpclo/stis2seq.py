@@ -1,8 +1,8 @@
 from typing import List, Tuple, Optional
 from pathlib import Path
-from data_types import STI, Tiep, Coincidence, CoincidenceSequence, PatternInstance, SequenceDB
-from tiep_index import TiepIndex
-import constants
+from tirpclo.data_types import STI, Tiep, Coincidence, CoincidenceSequence, PatternInstance, SequenceDB
+from tirpclo.tiep_index import TiepIndex
+from tirpclo import constants
 
 
 class EndTime:

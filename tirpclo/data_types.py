@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from tiep_index import TiepIndex
-import constants
+from tirpclo import constants
 
 
 @dataclass(order=True)

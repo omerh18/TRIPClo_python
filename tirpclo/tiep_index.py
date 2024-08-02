@@ -1,5 +1,5 @@
 from typing import List, Dict
-from data_types import Tiep
+from tirpclo.data_types import Tiep
 
 
 class MasterTiep:
