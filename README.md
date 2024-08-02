@@ -28,3 +28,9 @@ Please cite as:
     pytest==8.3.1
     pre-commit==3.5.0
     ```
+
+## Run
+
+```commandline
+python -m tirpclo.run -n {num-entities} -s {min-support} -g {maximal-gap} -f 'datasets/{path-to-dataset}'
+```
