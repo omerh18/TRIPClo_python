@@ -13,12 +13,12 @@ class MasterTiep:
         self.tiep_occurrences: Dict[str, List[Tiep]] = {}
         self.supporting_entities: List[str] = []
 
-    def add_occurrence(self, entity: str, tiep: Tiep) -> None:
+    def add_occurrence(self, entity: str, tiep: Tiep) -> int:
         """
         indexes a tiep instance within a specific entity
         :param entity: (str) entity ID
         :param tiep: (Tiep) additional tiep instance
-        :return: (None)
+        :return: (int) tiep instance index within entity
         """
 
         if entity not in self.tiep_occurrences:
@@ -28,21 +28,23 @@ class MasterTiep:
         tiep.entity_tiep_index = len(self.tiep_occurrences[entity])
         self.tiep_occurrences[entity].append(tiep)
 
+        return tiep.entity_tiep_index
+
 
 class TiepIndex:
     def __init__(self):
         self.master_tieps: Dict[str, MasterTiep] = {}
 
-    def add_tiep_occurrence(self, tiep_rep: str, entity: str, tiep: Tiep) -> None:
+    def add_tiep_occurrence(self, tiep_rep: str, entity: str, tiep: Tiep) -> int:
         """
         adds a tiep instance to the index
         :param tiep_rep: (ste) tiep representation
         :param entity: (str) entity ID
         :param tiep: (Tiep) tiep instance
-        :return:
+        :return: (int) tiep instance index within entity
         """
 
         if tiep_rep not in self.master_tieps:
             self.master_tieps[tiep_rep] = MasterTiep()
 
-        self.master_tieps[tiep_rep].add_occurrence(entity, tiep)
+        return self.master_tieps[tiep_rep].add_occurrence(entity, tiep)

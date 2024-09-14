@@ -32,5 +32,5 @@ Please cite as:
 ## Run
 
 ```commandline
-python -m tirpclo.run -n {num-entities} -s {min-support} -g {maximal-gap} -f 'datasets/{path-to-dataset}'
+python -m tirpclo.run -n num-entities -s min-support -g maximal-gap -f 'datasets/path-to-dataset'
 ```

@@ -1,28 +1,37 @@
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict
 import copy
-from tirpclo.data_types import SequenceDB, CoincidenceSequence, PatternInstance, Tiep, TiepProjector, Coincidence
+from tirpclo.data_types import SequenceDB, CoincidenceSequence, PatternInstance, Tiep, \
+	TiepProjector, Coincidence, BackwardExtensionTiep
 from tirpclo.tiep_index import TiepIndex, MasterTiep
+from tirpclo import closure_checking
 from tirpclo import constants
 from tirpclo import utils
 
 
 def project_initial_seq_db(
 		initial_seq_db: SequenceDB,
-		tiep: str,
+		tiep_primitive_rep: str,
 		supporting_entities: List[str],
-		index: TiepIndex
-) -> SequenceDB:
+		index: TiepIndex,
+		maximal_gap: int,
+		is_closed_tirp_mining: bool
+) -> Tuple[SequenceDB, Optional[bool], Optional[Dict[str, List[BackwardExtensionTiep]]]]:
 	"""
 	projects initial sequence database by a tiep
 	:param initial_seq_db: (SequenceDB) initial sequence database
-	:param tiep: (str) tiep for projection
+	:param tiep_primitive_rep: (str) tiep for projection
 	:param supporting_entities: (List[str]) list of supporting entities of the tiep
 	:param index: (TiepIndex) main tiep index
-	:return: (SequenceDB) projected sequence database
+	:param maximal_gap: (int) maximal gap
+	:param is_closed_tirp_mining: (bool) whether mining only closed TIRPs or not
+	:return: (Tuple[SequenceDB, bool, Dict[str, List[BackwardExtensionTiep]]]) projected sequence database, as well as
+		whether the projected pattern has the potential of being closed and its backward-extension tieps
 	"""
 
 	projected_db: List[Tuple[CoincidenceSequence, PatternInstance]] = []
-	master_tiep: MasterTiep = index.master_tieps[tiep]
+	master_tiep: MasterTiep = index.master_tieps[tiep_primitive_rep]
+	cumulative_be_tieps: Optional[Dict[str, BackwardExtensionTiep]] = None
+	entry_index: int = 0
 
 	for coincidence_seq, pattern_instance in initial_seq_db.db:
 		entity_id: str = coincidence_seq.entity
@@ -30,18 +39,41 @@ def project_initial_seq_db(
 			continue
 
 		entity_tiep_instances: List[Tiep] = master_tiep.tiep_occurrences[entity_id]
-		for i in range(len(entity_tiep_instances)):
-			tiep_instance: Tiep = entity_tiep_instances[i]
+		entity_be_tieps: Dict[str, BackwardExtensionTiep] = {}
+		for i, tiep_instance in enumerate(entity_tiep_instances):
 			projected_record: Optional[CoincidenceSequence] = __project_seq_by_tiep_instance(
-				tiep_instance, tiep, coincidence_seq, pattern_instance
+				tiep_instance, tiep_primitive_rep, coincidence_seq, pattern_instance
 			)
 
 			if projected_record is not None:
 				extended_pattern_instance: PatternInstance = PatternInstance()
-				extended_pattern_instance.extend_pattern_instance(tiep_instance)
+				if is_closed_tirp_mining:
+					extended_pattern_instance.next_coincidences.append(coincidence_seq.first_co)
+				extended_pattern_instance.extend_pattern_instance(
+					tiep_instance, projected_record.first_co, is_closed_tirp_mining
+				)
 				projected_db.append((projected_record, extended_pattern_instance))
 
-	return SequenceDB(projected_db, None, len(master_tiep.supporting_entities))
+				if is_closed_tirp_mining:
+					closure_checking.collect_be_tieps_wrt_tiep_instance(
+						tiep_instance, coincidence_seq.first_co if i == 0 else entity_tiep_instances[i - 1].coincidence,
+						entry_index, entity_be_tieps, cumulative_be_tieps, maximal_gap
+					)
+
+				entry_index += 1
+
+		cumulative_be_tieps = entity_be_tieps
+
+	be_tieps_lists: Optional[Dict[str, List[BackwardExtensionTiep]]] = None
+	may_be_closed: Optional[bool] = None
+	pre_matched: Optional[List[str]] = None
+	if is_closed_tirp_mining:
+		may_be_closed, be_tieps_lists = closure_checking.finalize_initial_be_tieps(cumulative_be_tieps)
+		pre_matched = [tiep_primitive_rep.replace(constants.START_REP, constants.FINISH_REP)]
+
+	return SequenceDB(
+		projected_db, None, len(master_tiep.supporting_entities), pre_matched
+	), may_be_closed, be_tieps_lists
 
 
 def project_projected_seq_db(
@@ -49,7 +81,8 @@ def project_projected_seq_db(
 		tiep: str,
 		tiep_projector: TiepProjector,
 		index: TiepIndex,
-		maximal_gap: int
+		maximal_gap: int,
+		is_closed_tirp_mining: bool
 ) -> SequenceDB:
 	"""
 	projects a projected sequence database by a tiep
@@ -58,6 +91,7 @@ def project_projected_seq_db(
 	:param tiep_projector: (TiepProjector) tiep-projector of the tiep
 	:param index: (TiepIndex) main tiep index
 	:param maximal_gap: (int) maximal gap
+	:param is_closed_tirp_mining: (bool) whether mining only closed TIRPs or not
 	:return: (SequenceDB) projected sequence database
 	"""
 
@@ -102,15 +136,25 @@ def project_projected_seq_db(
 				if entity_id not in supporting_entities:
 					supporting_entities.append(entity_id)
 				extended_pattern_instance: PatternInstance = PatternInstance()
-				extended_pattern_instance.pre_extend_copy(pattern_instance)
-				extended_pattern_instance.extend_pattern_instance(tiep_instance)
+				extended_pattern_instance.pre_extend_copy(pattern_instance, is_closed_tirp_mining)
+				extended_pattern_instance.extend_pattern_instance(
+					tiep_instance, projected_record.first_co, is_closed_tirp_mining
+				)
 				projected_db.append((projected_record, extended_pattern_instance))
 				projected_indices.append(db_entry_index)
 
 			if is_co or is_meet or not is_start_tiep:
 				break
 
-	return SequenceDB(projected_db, projected_indices, len(supporting_entities))
+	pre_matched: Optional[List[str]] = None
+	if is_closed_tirp_mining:
+		pre_matched = seq_db.pre_matched.copy()
+		if base_tiep_form[-1] == constants.START_REP:
+			pre_matched.append(base_tiep_form.replace(constants.START_REP, constants.FINISH_REP))
+		else:
+			pre_matched.remove(base_tiep_form)
+
+	return SequenceDB(projected_db, projected_indices, len(supporting_entities), pre_matched)
 
 
 def __project_seq_by_tiep_instance(

@@ -1,9 +1,35 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+from dataclasses import dataclass
 from typing.io import TextIO
 from pathlib import Path
+import distutils.util
 import argparse
 from tirpclo.data_types import Tiep, STI
 from tirpclo import constants
+
+
+@dataclass
+class RunConfig:
+    """this class represents a run configuration
+
+    Attributes:  # noqa
+        is_closed: (bool) whether mining only closed TIRPs or not
+        num_entities: (int) number of entities
+        min_support_percentage: (float) minimum vertical support percentage
+        maximal_gap: (int) maximal gap
+        in_file_path: (str) path to input file
+        out_file_path: (str) path to output file
+    """
+    is_closed_tirp_mining: bool
+    num_entities: int
+    min_support_percentage: float
+    maximal_gap: int
+    in_file_path: str
+    out_file_path: Optional[str] = None
+
+    def __post_init__(self):
+        if self.out_file_path is None:
+            self.out_file_path = f'{self.in_file_path[: -4]}-support-{self.min_support_percentage}-gap-{self.maximal_gap}.txt'
 
 
 def parse_arguments(
@@ -14,6 +40,9 @@ def parse_arguments(
     """
 
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '-c', '--is_closed_tirp_mining', type=lambda x: bool(distutils.util.strtobool(x)), required=True
+    )
     parser.add_argument(
         '-n', '--num_entities', type=int, required=True
     )
@@ -38,7 +67,7 @@ def out_file_set_up(
     """
     sets-up an output file, in append mode
     :param out_file_path: (str) output file path
-    :return: (TextIOWrapper) output file
+    :return: (TextIO) output file
     """
 
     if Path(out_file_path).is_file():
