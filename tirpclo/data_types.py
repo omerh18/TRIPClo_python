@@ -14,10 +14,13 @@ class STI:
         start_time: (int) start-time
         finish_time: (int) finish-time
         symbol: (int) symbol
+        entity_sti_index: (int) index of STI within ordered list of STIs having the same symbol
+            in the respective entity
     """
     start_time: int
     finish_time: int
     symbol: int
+    entity_sti_index: int = -1
 
     def __repr__(self):
         return f"[{self.start_time}-{self.finish_time}]"
@@ -93,6 +96,7 @@ class PatternInstance:
 
     Attributes:  # noqa
         tieps: (List[Tiep]) ordered list of tieps
+        next_coincidences: (List[Coincidence]) list of pointers to coincidences appearing right after projection by the tieps
         symbol_db_indices: (Dict[int, int]) index of latest entity occurrence of each symbol of the pattern instance
         minimal_finish_time: (float) minimal finish time of an STI within the pattern instance
         pre_matched: (List[STI]) list of STI for which only the start tieps are included within the pattern instances
@@ -100,20 +104,26 @@ class PatternInstance:
             pattern instance
     """
     tieps: List[Tiep] = field(default_factory=lambda: [])
+    next_coincidences: List[Coincidence] = field(default_factory=lambda: [])
     symbol_db_indices: Dict[int, int] = field(default_factory=lambda: {})
     minimal_finish_time: float = float('inf')
     pre_matched: List[STI] = field(default_factory=lambda: [])
     first_expected_finish_time: float = float('inf')
 
-    def pre_extend_copy(self, current_pattern_instance: 'PatternInstance') -> None:
+    def pre_extend_copy(self, current_pattern_instance: 'PatternInstance', is_closed_tirp_mining: bool) -> None:
         """
         copies (deep) contents of input pattern instance prior to extension
         :param current_pattern_instance: (PatternInstance) input pattern instance to duplicate
+        :param is_closed_tirp_mining: (bool) whether mining only closed TIRPs or not
         :return: (None)
         """
 
         for t in current_pattern_instance.tieps:
             self.tieps.append(t)
+
+        if is_closed_tirp_mining:
+            for c in current_pattern_instance.next_coincidences:
+                self.next_coincidences.append(c)
 
         self.symbol_db_indices = dict(current_pattern_instance.symbol_db_indices)
         self.minimal_finish_time = current_pattern_instance.minimal_finish_time
@@ -123,14 +133,18 @@ class PatternInstance:
 
         self.first_expected_finish_time = current_pattern_instance.first_expected_finish_time
 
-    def extend_pattern_instance(self, new_tiep: Tiep) -> None:
+    def extend_pattern_instance(self, new_tiep: Tiep, next_coincidence: Coincidence, is_closed_tirp_mining: bool) -> None:
         """
         extends the current pattern instance with an additional tiep
         :param new_tiep: (Tiep) additional tiep
+        :param next_coincidence: (Coincidence) coincidence appearing right after projection by the tiep
+        :param is_closed_tirp_mining: (bool) whether mining only closed TIRPs or not
         :return: (None)
         """
 
         self.tieps.append(new_tiep)
+        if is_closed_tirp_mining:
+            self.next_coincidences.append(next_coincidence)
 
         if new_tiep.sti in self.pre_matched:
             self.pre_matched.remove(new_tiep.sti)
@@ -156,12 +170,13 @@ class SequenceDB:
         db: (List[Tuple[CoincidenceSequence, PatternInstance]]) list of coincidence sequences & respective discovered
             pattern instances
         entries_prev_indices: (Optional[List[int]]) indices of db entries within previous sequence database,
-            from which the current sequences database has been projected
+            from which the current sequence database has been projected
         support: (int) vertical support of pattern represented by this sequence database
     """
     db: List[Tuple[CoincidenceSequence, PatternInstance]]
     entries_prev_indices: Optional[List[int]]
     support: int
+    pre_matched: Optional[List[str]]
 
     def filter_infrequent_tieps_from_initial_seq_db(self, index: 'TiepIndex') -> None:
         """
@@ -216,3 +231,20 @@ class TiepProjector:
     """
     supporting_entities: List[str] = field(default_factory=lambda: [])
     first_indices: Dict[int, int] = field(default_factory=lambda: {})
+
+
+@dataclass
+class BackwardExtensionTiep:
+    """this class represents a 'Backward-Extension' Tiep, i.e., a data structure which models
+        the per-record STIs of a backward-extension tiep from some i-th before/co period of time
+        w.r.t a given pattern
+
+    Attributes:  # noqa
+        stis_per_entry: (Dict[int, List[STI]]) list of STIs per entry of a sequence database
+    """
+    stis_per_entry: Dict[int, List[STI]] = field(default_factory=lambda: {})
+
+    def add_sti_in_entry(self, entry_index: int, sti: STI) -> None:
+        if entry_index not in self.stis_per_entry:
+            self.stis_per_entry[entry_index] = []
+        self.stis_per_entry[entry_index].append(sti)

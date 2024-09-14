@@ -11,7 +11,8 @@ def get_tiep_projectors(
 		previous_tiep_projectors: Dict[str, TiepProjector],
 		index: TiepIndex,
 		min_support: int,
-		maximal_gap: int
+		maximal_gap: int,
+		is_closed_tirp_mining: bool
 ) -> Dict[str, TiepProjector]:
 	"""
 	generates and returns new tiep-projectors based on the previous ones, if exist
@@ -22,12 +23,13 @@ def get_tiep_projectors(
 	:param index: (TiepIndex) main tiep-index
 	:param min_support: (int) minimum vertical support threshold
 	:param maximal_gap: (int) maximal gap
+	:param is_closed_tirp_mining: (bool) whether mining only closed TIRPs or not
 	:return: (Dict[str, TiepProjector]) new tiep-projectors
 	"""
 
 	if previous_tiep_projectors is None:
 		# initial tiep-projectors
-		return __get_initial_tiep_projectors(seq_db, pattern_last_tiep, maximal_gap)
+		return __get_initial_tiep_projectors(seq_db, pattern_last_tiep, maximal_gap, is_closed_tirp_mining)
 
 	# get base primitive form of last tiep
 	if pattern_last_tiep[0] == constants.CO_REP or pattern_last_tiep[0] == constants.MEET_REP:
@@ -39,7 +41,7 @@ def get_tiep_projectors(
 	# populate tiep-projectors based on recent ones
 	__populate_tiep_projectors_based_on_recent(
 		seq_db, pattern_last_tiep, previous_tiep_projectors, index,
-		min_support, maximal_gap, tiep_projectors, allowed_non_supporting_records
+		min_support, maximal_gap, tiep_projectors, allowed_non_supporting_records, is_closed_tirp_mining
 	)
 
 	# if the last tiep was a start tiep, add complement to tiep-projectors
@@ -48,8 +50,8 @@ def get_tiep_projectors(
 			seq_db, pattern_last_tiep, index, tiep_projectors, allowed_non_supporting_records
 		)
 
-	# if the last tiep was a finish tiep, potentially add complement to tiep-projectors
-	if pattern_last_tiep[-1] == constants.FINISH_REP:
+	# in case of entire frequent TIRP mining, if the last tiep was a finish tiep, potentially add complement to tiep-projectors
+	if not is_closed_tirp_mining and pattern_last_tiep[-1] == constants.FINISH_REP:
 		__add_complement_start_tiep_to_tiep_projectors(
 			seq_db, pattern_last_tiep, index, maximal_gap, tiep_projectors, allowed_non_supporting_records
 		)
@@ -63,7 +65,7 @@ def get_tiep_projectors(
 			entry_index += 1
 			continue
 		__add_relevant_meet_co_tieps_to_tiep_projectors(
-			current_coincidence, entity_id, entry_index, tiep_projectors, pattern_instance
+			current_coincidence, entity_id, entry_index, tiep_projectors, pattern_instance, is_closed_tirp_mining
 		)
 		entry_index += 1
 
@@ -78,7 +80,8 @@ def __populate_tiep_projectors_based_on_recent(
 		min_support: int,
 		maximal_gap: int,
 		tiep_projectors: Dict[str, TiepProjector],
-		allowed_non_supporting_records: int
+		allowed_non_supporting_records: int,
+		is_closed_tirp_mining: bool
 ) -> None:
 	"""
 	populates newly created tiep-projectors based on recent ones
@@ -92,6 +95,7 @@ def __populate_tiep_projectors_based_on_recent(
 	:param tiep_projectors: (Dict[str, TiepProjector]) incrementally populated new tiep-projectors
 	:param (int) allowed_non_supporting_records: maximal allowed number of non-supporting records for
 		a tiep to be surely concluded as infrequent
+	:param is_closed_tirp_mining: (bool) whether mining only closed TIRPs or not
 	:return: (None)
 	"""
 
@@ -103,11 +107,12 @@ def __populate_tiep_projectors_based_on_recent(
 			continue
 		if tiep[0] == constants.CO_REP or tiep[0] == constants.MEET_REP:
 			continue
-		if pattern_last_tiep == tiep:
+
+		is_finish_tiep: bool = tiep[-1] == constants.FINISH_REP
+		if (not is_closed_tirp_mining or is_finish_tiep) and pattern_last_tiep == tiep:
 			continue
 
 		master_tiep: MasterTiep = index.master_tieps[tiep]
-		is_finish_tiep: bool = tiep[-1] == constants.FINISH_REP
 		entry_index: int = 0
 		non_supporting_records: int = 0
 
@@ -147,7 +152,7 @@ def __populate_tiep_projectors_based_on_recent(
 			tiep_instances: List[Tiep] = master_tiep.tiep_occurrences[entity_id]
 			# if it is a finish tiep, check if the projected coincidence sequence includes the specific instance
 			# of the start tiep which complements the current tiep within the pattern instance
-			if is_finish_tiep:
+			if not is_closed_tirp_mining and is_finish_tiep:
 				tiep_index: int = pattern_instance.symbol_db_indices[tiep_instances[0].symbol]
 				if tiep_instances[tiep_index].coincidence.index >= start_co_index:
 					__add_tiep_instance_to_tiep_projectors(
@@ -162,11 +167,12 @@ def __populate_tiep_projectors_based_on_recent(
 			prev_start_index: int = previous_tiep_projector.first_indices[previous_entry_index]
 			found: bool = False
 			for i in range(prev_start_index, len(tiep_instances)):
-				if not utils.max_gap_holds(pattern_instance.minimal_finish_time, tiep_instances[i], maximal_gap):
+				if not is_finish_tiep and \
+						not utils.max_gap_holds(pattern_instance.minimal_finish_time, tiep_instances[i], maximal_gap):
 					break
 				if tiep_instances[i].coincidence.index >= start_co_index:
 					__add_tiep_instance_to_tiep_projectors(
-						tiep, entity_id, entry_index, tiep_projectors, i, validate_first=False
+						tiep, entity_id, entry_index, tiep_projectors, i, validate_first=is_closed_tirp_mining
 					)
 					found = True
 					break
@@ -304,13 +310,15 @@ def __add_complement_start_tiep_to_tiep_projectors(
 def __get_initial_tiep_projectors(
 		seq_db: SequenceDB,
 		pattern_last_tiep: str,
-		maximal_gap: int
+		maximal_gap: int,
+		is_closed_tirp_mining: bool
 ) -> Dict[str, TiepProjector]:
 	"""
 	generates and returns new tiep-projectors when no previous ones exist
 	:param seq_db: (SequenceDB) projected sequence database
 	:param pattern_last_tiep: (str) last tiep of current pattern represented by the sequence database
 	:param maximal_gap: (int) maximal gap
+	:param is_closed_tirp_mining (bool) whether mining only closed TIRPs or not
 	:return: (Dict[str, TiepProjector]) new tiep-projectors
 	"""
 
@@ -331,7 +339,7 @@ def __get_initial_tiep_projectors(
 			tieps: List[Tiep] = current_coincidence.tieps
 			is_finish_tieps_coincidence: bool = tieps[0].type == constants.FINISH_REP
 			# skip finish tieps after the complement of last tiep has been found & start tieps
-			# after violating maximal gap
+			# after violating maximal gap, in case of entire frequent TIRP mining
 			if (found_complement and is_finish_tieps_coincidence) or (beyond_gap and not is_finish_tieps_coincidence):
 				current_coincidence = current_coincidence.next
 				continue
@@ -339,17 +347,19 @@ def __get_initial_tiep_projectors(
 			for current_tiep in tieps:
 				# for a finish tiep, add only if complements last tiep
 				if is_finish_tieps_coincidence:
-					if pattern_last_tiep == current_tiep.primitive_rep.replace(constants.FINISH_REP, constants.START_REP):
+					if is_closed_tirp_mining or \
+							pattern_last_tiep == current_tiep.primitive_rep.replace(constants.FINISH_REP, constants.START_REP):
 						__add_tiep_instance_to_tiep_projectors(
 							current_tiep.primitive_rep, entity_id, entry_index,
-							tiep_projectors, current_tiep.entity_tiep_index, validate_first=False
+							tiep_projectors, current_tiep.entity_tiep_index, validate_first=is_closed_tirp_mining
 						)
-						found_complement = True
-						break
+						if not is_closed_tirp_mining:
+							found_complement = True
+							break
 					continue
 
 				# for a start-tiep which differs from the last tiep, add only if does not violate maximal gap
-				if pattern_last_tiep == current_tiep.primitive_rep:
+				if not is_closed_tirp_mining and pattern_last_tiep == current_tiep.primitive_rep:
 					continue
 				if not utils.max_gap_holds(pattern_instance.minimal_finish_time, current_tiep, maximal_gap):
 					beyond_gap = True
@@ -381,7 +391,7 @@ def __add_tiep_instance_to_tiep_projectors(
 	adds a new tiep instance to the tiep-projector of a tiep
 	:param tiep_rep: (str) tiep representation
 	:param entity_id: (str) entity ID
-	:param entry_index: (int) index of entry in sequences database
+	:param entry_index: (int) index of entry in sequence database
 	:param tiep_projectors: (Dict[str, TiepProjector]) tiep-projectors
 	:param first_index: (int) tiep first index within entry's coincidence sequence
 	:param validate_first: (bool) whether to check or not for an already recorded first index
@@ -403,15 +413,17 @@ def __add_relevant_meet_co_tieps_to_tiep_projectors(
 		entity_id: str,
 		entry_index: int,
 		tieps_projectors: Dict[str, TiepProjector],
-		pattern_instance: PatternInstance
+		pattern_instance: PatternInstance,
+		is_closed_tirp_mining: bool
 ) -> None:
 	"""
 	add meet & co-occurrence tieps to tiep-projectors
 	:param current_coincidence: (Coincidence) current coincidence sequence
 	:param entity_id: (str) entity ID
-	:param entry_index: (int) index of entry in sequences database
+	:param entry_index: (int) index of entry in sequence database
 	:param tieps_projectors: (Dict[str, TiepProjector]) tiep-projectors
 	:param pattern_instance: (PatternInstance) current pattern instance
+	:param is_closed_tirp_mining (bool) whether mining only closed TIRPs or not
 	:return:
 	"""
 
@@ -421,7 +433,7 @@ def __add_relevant_meet_co_tieps_to_tiep_projectors(
 		is_finish_tieps_coincidence: bool = current_coincidence.tieps[0].type == constants.FINISH_REP
 		for i in range(len(tieps)):
 			tiep_rep: str = constants.CO_REP + '' + tieps[i].primitive_rep
-			if is_finish_tieps_coincidence and tieps[i].sti not in pattern_instance.pre_matched:
+			if not is_closed_tirp_mining and is_finish_tieps_coincidence and tieps[i].sti not in pattern_instance.pre_matched:
 				continue
 			__add_tiep_instance_to_tiep_projectors(
 				tiep_rep, entity_id, entry_index, tieps_projectors, tieps[i].orig_tiep.entity_tiep_index

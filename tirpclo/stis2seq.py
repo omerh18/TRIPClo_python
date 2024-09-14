@@ -107,7 +107,7 @@ def transform_input_file_to_seq_db(
             pattern_instance: PatternInstance = PatternInstance()
             seq_db.append((coincidence_seq, pattern_instance))
 
-    return SequenceDB(seq_db, None, 0)
+    return SequenceDB(seq_db, None, 0, None)
 
 
 def __add_sti_to_end_times(
@@ -238,4 +238,4 @@ def __generate_and_index_coincidence_tieps(
     for sti in stis:
         tiep: Tiep = Tiep(time, sti, coincidence, tieps_type)
         coincidence.tieps.append(tiep)
-        tiep_index.add_tiep_occurrence(tiep.primitive_rep, entity, tiep)
+        sti.entity_sti_index = tiep_index.add_tiep_occurrence(tiep.primitive_rep, entity, tiep)

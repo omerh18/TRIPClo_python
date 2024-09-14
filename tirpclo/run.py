@@ -8,48 +8,41 @@ from tirpclo import stis2seq
 from tirpclo import utils
 
 
-def run_tirpclo(
-        num_entities: int,
-        min_support_percentage: float,
-        maximal_gap: int,
-        in_file_path: str,
-        out_file_path: str = None
-) -> None:
+def run_tirpclo(run_config: utils.RunConfig) -> None:
     """
     runs TIRPClo to discover the entire set of frequent TIRPs
-    :param num_entities: (int) number of dataset's entities
-    :param min_support_percentage: (float) minimum vertical support threshold
-    :param maximal_gap: (int) maximal gap
-    :param in_file_path: (str) path to input file
-    :param out_file_path: (str) path to TIRPs output file
+    :param run_config: (utils.RunConfig) run configuration
     :return: (None)
     """
 
-    if out_file_path is None:
-        out_file_path: str = f'{in_file_path[: -4]}-support-{min_support_percentage}-gap-{maximal_gap}.txt'
-
-    out_file: TextIO = utils.out_file_set_up(out_file_path)
-    min_support: int = math.ceil(num_entities * min_support_percentage)
-    print(f'***START***\nrunning TIRPClo on dataset: {in_file_path}, support - {min_support_percentage}, gap - {maximal_gap}.')
+    out_file: TextIO = utils.out_file_set_up(run_config.out_file_path)
+    min_support: int = math.ceil(run_config.num_entities * run_config.min_support_percentage)
+    print(
+        f'***START***\nrunning TIRPClo on dataset: {run_config.in_file_path}, '
+        f'support - {run_config.min_support_percentage}, gap - {run_config.maximal_gap}.'
+    )
 
     start_time: float = time.time()
 
     index: TiepIndex = TiepIndex()
-    initial_seq_db: SequenceDB = stis2seq.transform_input_file_to_seq_db(in_file_path, index)
-    main_algorithm.discover_tirps(index, initial_seq_db, min_support, maximal_gap, out_file)
+    initial_seq_db: SequenceDB = stis2seq.transform_input_file_to_seq_db(run_config.in_file_path, index)
+    main_algorithm.discover_tirps(
+        index, initial_seq_db, min_support, run_config.maximal_gap, out_file, run_config.is_closed_tirp_mining
+    )
 
     end_time: float = time.time()
 
     runtime_sec: float = end_time - start_time
     print(f'***FINISHED***\nruntime - {runtime_sec} (sec).')
     out_file.close()
-    utils.generate_sorted_output_file(out_file_path)
-    utils.generate_stats_output_file(out_file_path, runtime_sec)
+    utils.generate_sorted_output_file(run_config.out_file_path)
+    utils.generate_stats_output_file(run_config.out_file_path, runtime_sec)
 
 
 if __name__ == '__main__':
     parsed_args = utils.parse_arguments()
-    run_tirpclo(**parsed_args)
+    input_run_config = utils.RunConfig(**parsed_args)
+    run_tirpclo(input_run_config)
     # run_tirpclo(
     #     num_entities=65, min_support_percentage=0.5, maximal_gap=30, in_file_path='datasets/asl/asl.csv'
     # )

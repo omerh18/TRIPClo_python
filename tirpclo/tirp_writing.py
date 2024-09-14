@@ -11,7 +11,7 @@ def write_tirp(
     """
     writes a TIRP represented by the sequence database to the output file
     :param seq_db: (SequenceDB) sequence database representing a TIRP
-    :param out_file: (TextIOWrapper) output file
+    :param out_file: (TextIO) output file
     :return: (None)
     """
 
